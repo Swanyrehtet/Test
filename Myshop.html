@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard</title>
+    
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Include Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    
+    <style>
+        #map {
+            height: 400px;
+            margin-top: 20px;
+        }
+        canvas {
+            max-width: 600px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>IoT Dashboard</h1>
+    
+    <!-- Line chart -->
+    <canvas id="lineChart"></canvas>
+    
+    <!-- Map -->
+    <div id="map"></div>
+    
+    <script>
+        // Auto-refresh the page every 30 seconds
+        setInterval(function() {
+            location.reload();
+        }, 7000);
+        // ThingSpeak API details (replace with your channel ID and API key)
+        const apiKey = 'CP5HR5AHTCMX4U89';
+        const channelID = '2618338';
+        
+        // Function to fetch data from ThingSpeak
+        async function fetchData() {
+            const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${apiKey}&results=10`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data.feeds;
+        }
+
+        // Function to update the line chart
+        async function updateChart() {
+            const feeds = await fetchData();
+            
+            const labels = feeds.map(feed => new Date(feed.created_at).toLocaleTimeString());
+            const temperature = feeds.map(feed => parseFloat(feed.field1));
+            const humidity = feeds.map(feed => parseFloat(feed.field2));
+            const heartbeat = feeds.map(feed => parseFloat(feed.field6));
+            const status = feeds.map(feed => parseInt(feed.field5));
+            
+            const ctx = document.getElementById('lineChart').getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Temperature',
+                            data: temperature,
+                            borderColor: 'red',
+                            fill: false
+                        },
+                        {
+                            label: 'Humidity',
+                            data: humidity,
+                            borderColor: 'blue',
+                            fill: false
+                        },
+                        {
+                            label: 'Heartbeat',
+                            data: heartbeat,
+                            borderColor: 'green',
+                            fill: false
+                        },
+                        {
+                            label: 'Status',
+                            data: status,
+                            borderColor: 'orange',
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+        scales: {
+            y: {
+                beginAtZero: true,
+                min: 0,
+                max: 100 // Set the y-axis range from 0 to 100
+            }
+        }
+    }
+            });
+        }
+
+        // Function to update the map
+        async function updateMap() {
+            const feeds = await fetchData();
+            const latestFeed = feeds[feeds.length - 1]; // Get the latest feed
+            
+            const lat = parseFloat(latestFeed.field3); // Assuming field5 is latitude
+            const lon = parseFloat(latestFeed.field4); // Assuming field6 is longitude
+            
+            const map = L.map('map').setView([lat, lon], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+            }).addTo(map);
+
+            L.marker([lat, lon]).addTo(map)
+                .bindPopup(`Location: [${lat}, ${lon}]`)
+                .openPopup();
+        }
+
+        // Initialize the dashboard
+        async function initDashboard() {
+            await updateChart();
+            await updateMap();
+        }
+
+        // Load the dashboard on page load
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>
